@@ -188,7 +188,7 @@ static void http_process(http_worker_t *worker, FILE *stream)
     break;
   }
 
-  LOG_INFO(worker, "Request '%s' '%s' '%s'", worker->request_method, worker->request_uri, worker->request_params);
+  LOG_DEBUG(worker, "Request '%s' '%s' '%s'", worker->request_method, worker->request_uri, worker->request_params);
 
   if (worker->current_method) {
     worker->current_method->func(worker, stream);
@@ -202,7 +202,7 @@ static void http_process(http_worker_t *worker, FILE *stream)
 static void http_client(http_worker_t *worker)
 {
   worker->client_host = inet_ntoa(worker->client_addr.sin_addr);
-  LOG_INFO(worker, "Client connected %s (fd=%d).", worker->client_host, worker->client_fd);
+  LOG_DEBUG(worker, "Client connected %s (fd=%d).", worker->client_host, worker->client_fd);
 
   struct timeval tv;
   tv.tv_sec = 3;
@@ -227,7 +227,7 @@ static void http_client(http_worker_t *worker)
     worker->client_fd = -1;
   }
 
-  LOG_INFO(worker, "Client disconnected %s.", worker->client_host);
+  LOG_DEBUG(worker, "Client disconnected %s.", worker->client_host);
   worker->client_host = NULL;
 }
 
