@@ -97,9 +97,9 @@ static bool links_enqueue_capture_buffers(buffer_list_t *capture_list, int *time
   uint64_t now_us = get_monotonic_time_us(NULL, NULL);
 
   if (now_us - capture_list->last_enqueued_us > STALE_TIMEOUT_US && capture_list->dev->output_list == NULL) {
-    LOG_INFO(capture_list, "Stale detected. Restarting streaming...");
+    LOG_ERROR(capture_list, "Stale detected. Stopping streaming / killing streamer...");
     buffer_list_set_stream(capture_list, false);
-    buffer_list_set_stream(capture_list, true);
+    exit(-1);
   }
 
   // skip if all enqueued
