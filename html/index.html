@@ -11,6 +11,18 @@
 	<ul>
 		<br>
 		<li>
+			<a href="preview"><b>/preview</b></a> (JPEG image)<br>
+			<br>
+			<ul>
+				<li>Get a high-resolution preview image from the server.</li>
+				<li>Uses resolution specified by <i>-camera-preview.height=</i>.</li>
+				<br>
+				<li><a href="preview?max_delay=0">/preview?max_delay=0</a> to get a preview captured exactly now.</li>
+				<li><a href="preview?max_delay=300">/preview?max_delay=300</a> (default) to get a cached preview captured up-to 300 ms in the past.</li>
+			</ul>
+		</li>
+		<br>
+		<li>
 			<a href="snapshot"><b>/snapshot</b></a> (JPEG image)<br>
 			<br>
 			<ul>
@@ -77,6 +89,7 @@
 			The mjpg-streamer compatibility layer:<br>
 			<br>
 			<ul>
+				<li><a href="?action=preview">/?action=preview</a> as alias to the <a href="preview">/preview</a>.</li>				
 				<li><a href="?action=snapshot">/?action=snapshot</a> as alias to the <a href="snapshot">/snapshot</a>.</li>
 				<li><a href="?action=stream">/?action=stream</a> as alias to the <a href="stream">/stream</a>.</li>
 			</ul>

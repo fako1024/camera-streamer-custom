@@ -172,6 +172,7 @@ extern "C" void camera_status_json(http_worker_t *worker, FILE *stream)
   message["version"] = GIT_VERSION;
   message["revision"] = GIT_REVISION;
 
+  message["outputs"]["preview"] = serialize_buf_lock(&preview_lock);
   message["outputs"]["snapshot"] = serialize_buf_lock(&snapshot_lock);
   message["outputs"]["stream"] = serialize_buf_lock(&stream_lock);
   message["outputs"]["video"] = serialize_buf_lock(&video_lock);
@@ -183,6 +184,7 @@ extern "C" void camera_status_json(http_worker_t *worker, FILE *stream)
   message["endpoints"]["webrtc"] = get_url(video_lock.buf_list != NULL && webrtc_options.running, "video", "http", worker->host, http_options.port, "/webrtc");
   message["endpoints"]["video"] = get_url(video_lock.buf_list != NULL, "video", "http", worker->host, http_options.port, "/video");
   message["endpoints"]["stream"] = get_url(stream_lock.buf_list != NULL, "stream", "http", worker->host, http_options.port, "/stream");
+  message["endpoints"]["preview"] = get_url(preview_lock.buf_list != NULL, "preview", "http", worker->host, http_options.port, "/preview");
   message["endpoints"]["snapshot"] = get_url(snapshot_lock.buf_list != NULL, "snapshot", "http", worker->host, http_options.port, "/snapshot");
 
   if (rtsp_options.running) {

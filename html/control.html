@@ -416,6 +416,7 @@
               <ul>
                 <li>Changes are not persisted.</li>
                 <li>Use <i>--camera-options</i> to persist CAMERA settings.</li>
+                <li>Use <i>--camera-preview.options</i> to persist PREVIEW settings.</li>
                 <li>Use <i>--camera-snapshot.options</i> to persist SNAPSHOT settings.</li>
                 <li>Use <i>--camera-stream.options</i> to persist STREAM settings.</li>
                 <li>Use <i>--camera-video.options</i> to persist VIDEO settings.</li>
@@ -424,6 +425,10 @@
               </ul>
 
               <h1 id="anchor">Links</h1>
+              <div class="input-group hidden" id="preview-group">
+                <label for="preview_url">Preview</label>
+                <a id="preview_url" class="default-action">Unknown</a>
+              </div>
               <div class="input-group hidden" id="snapshot-group">
                 <label for="snapshot_url">Snapshot</label>
                 <a id="snapshot_url" class="default-action">Unknown</a>
@@ -473,6 +478,7 @@
   <script>
   document.addEventListener('DOMContentLoaded', function (event) {
     var streamURL = 'stream';
+    var previewURL = 'preview';
     var snapshotURL = 'snapshot';
     var webrtcURL = 'webrtc';
 
@@ -517,6 +523,7 @@
       })
 
     const configureEndpoints =(state) => {
+      enable2(document.getElementById('get-preview'), state.endpoints.preview.enabled);
       enable2(document.getElementById('get-still'), state.endpoints.snapshot.enabled);
       enable2(document.getElementById('mjpeg-stream'), state.endpoints.stream.enabled);
       enable2(document.getElementById('webrtc-stream'), state.endpoints.webrtc.enabled);
@@ -524,7 +531,7 @@
       document.getElementById('git_version').textContent = state.version;
       document.getElementById('git_revision').textContent = state.revision;
 
-      for (let type of ["snapshot", "stream", "video", "webrtc", "rtsp"]) {
+      for (let type of ["preview", "snapshot", "stream", "video", "webrtc", "rtsp"]) {
         if (!state.endpoints[type].enabled)
           continue;
         let groupView = document.getElementById(`${type}-group`);
@@ -731,6 +738,14 @@
       rtcPeerConnection.close();
       hide(streamContainer);
       hide(videoContainer);
+    }
+
+    document.getElementById('get-preview').onclick = () => {
+      stopStream();
+      const view = document.getElementById("stream-view");
+      view.src = `${previewURL}?_cb=${Date.now()}`;
+      view.scrollIntoView(false);
+      show(streamContainer);
     }
 
     document.getElementById('get-still').onclick = () => {

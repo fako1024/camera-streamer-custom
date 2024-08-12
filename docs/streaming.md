@@ -7,6 +7,7 @@ Camera Streamer exposes a number of streaming capabilities.
 All streams are exposed over very simple HTTP server, providing different streams for different purposes:
 
 - `http://<ip>:8080/` - index page
+- `http://<ip>:8080/preview` - provide JPEG preview (works well everywhere)
 - `http://<ip>:8080/snapshot` - provide JPEG snapshot (works well everywhere)
 - `http://<ip>:8080/stream` - provide MJPEG stream (works well everywhere)
 - `http://<ip>:8080/video` - provide automated video.mp4 or video.hls stream depending on browser used

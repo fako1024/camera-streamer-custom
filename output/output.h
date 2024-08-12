@@ -5,11 +5,13 @@
 struct http_worker_s;
 struct buffer_s;
 
+extern struct buffer_lock_s preview_lock;
 extern struct buffer_lock_s snapshot_lock;
 extern struct buffer_lock_s stream_lock;
 extern struct buffer_lock_s video_lock;
 
 // M-JPEG
+void http_preview(struct http_worker_s *worker, FILE *stream);
 void http_snapshot(struct http_worker_s *worker, FILE *stream);
 void http_stream(struct http_worker_s *worker, FILE *stream);
 void http_option(struct http_worker_s *worker, FILE *stream);

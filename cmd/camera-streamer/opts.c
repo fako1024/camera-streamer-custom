@@ -21,6 +21,9 @@ camera_options_t camera_options = {
   .auto_focus = true,
   .options = "",
   .list_options = false,
+  .preview = {
+    .options = "compression_quality=80"
+  },
   .snapshot = {
     .options = "compression_quality=80"
   },
@@ -113,6 +116,9 @@ option_t all_options[] = {
   DEFINE_OPTION_DEFAULT(camera, hflip, bool, "1", "Do horizontal image flip (does not work with all camera)."),
 
   DEFINE_OPTION_PTR(camera, isp.options, list, "Set the ISP processing options. List all available options with `-camera-list_options`."),
+
+  DEFINE_OPTION_PTR(camera, preview.options, list, "Set the JPEG compression options. List all available options with `-camera-list_options`."),
+  DEFINE_OPTION(camera, preview.height, uint, "Override the preview height and maintain aspect ratio."),
 
   DEFINE_OPTION_PTR(camera, snapshot.options, list, "Set the JPEG compression options. List all available options with `-camera-list_options`."),
   DEFINE_OPTION(camera, snapshot.height, uint, "Override the snapshot height and maintain aspect ratio."),

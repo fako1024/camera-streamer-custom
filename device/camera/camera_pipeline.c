@@ -20,6 +20,12 @@ static unsigned snapshot_formats[] =
 
 static link_callbacks_t snapshot_callbacks =
 {
+  .name = "PREVIEW-CAPTURE",
+  .buf_lock = &preview_lock
+};
+
+static link_callbacks_t snapshot_callbacks =
+{
   .name = "SNAPSHOT-CAPTURE",
   .buf_lock = &snapshot_lock
 };
@@ -47,6 +53,11 @@ int camera_configure_pipeline(camera_t *camera, buffer_list_t *camera_capture)
   camera_capture->do_timestamps = true;
 
   camera_debug_capture(camera, camera_capture);
+
+  if (camera_configure_output(camera, camera_capture, "PREVIEW", &camera->options.preview,
+    snapshot_formats, preview_callbacks, &camera->codec_preview) < 0) {
+    return -1;
+  }
 
   if (camera_configure_output(camera, camera_capture, "SNAPSHOT", &camera->options.snapshot,
     snapshot_formats, snapshot_callbacks, &camera->codec_snapshot) < 0) {

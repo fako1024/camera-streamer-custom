@@ -38,6 +38,9 @@ void deprecations()
 
 void inherit()
 {
+  if (!camera_options.preview.height || camera_options.preview.height > camera_options.height)
+    camera_options.preview.height = camera_options.height;
+
   if (!camera_options.snapshot.height || camera_options.snapshot.height > camera_options.height)
     camera_options.snapshot.height = camera_options.height;
 

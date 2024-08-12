@@ -45,6 +45,31 @@ int http_snapshot_buf_part(buffer_lock_t *buf_lock, buffer_t *buf, int frame, ht
   return 1;
 }
 
+void http_preview(http_worker_t *worker, FILE *stream)
+{
+  int max_delay_value = SNAPSHOT_DEFAULT_DELAY_PARAM;
+
+  // passing the max_delay=0 will ensure that frame is capture at this exact moment
+  char *max_delay = http_get_param(worker, "max_delay");
+  if (max_delay) {
+    max_delay_value = atoi(max_delay);
+    free(max_delay);
+  }
+
+  http_snapshot_t snapshot = {
+    .stream = stream,
+    .start_time_us = get_monotonic_time_us(NULL, NULL) - max_delay_value * 1000
+  };
+
+  int n = buffer_lock_write_loop(&preview_lock, 1, SNAPSHOT_TIMEOUT_MS,
+    (buffer_write_fn)http_snapshot_buf_part, &snapshot);
+
+  if (n <= 0) {
+    http_500(stream, NULL);
+    fprintf(stream, "No preview captured yet.\r\n");
+  }
+}
+
 void http_snapshot(http_worker_t *worker, FILE *stream)
 {
   int max_delay_value = SNAPSHOT_DEFAULT_DELAY_PARAM;

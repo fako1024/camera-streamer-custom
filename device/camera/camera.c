@@ -115,6 +115,7 @@ int camera_set_params(camera_t *camera)
   }
 
   // Set some defaults
+  device_set_option_list(camera->codec_preview, camera->options.preview.options);
   device_set_option_list(camera->codec_snapshot, camera->options.snapshot.options);
   device_set_option_list(camera->codec_stream, camera->options.stream.options);
   device_set_option_string(camera->codec_video, "repeat_sequence_header", "1"); // required for force key support

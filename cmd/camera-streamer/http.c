@@ -79,9 +79,12 @@ static void http_cors_options(http_worker_t *worker, FILE *stream)
 }
 
 http_method_t http_methods[] = {
+   { "GET",  "/preview", http_preview },
+  { "GET",  "/preview.jpg", http_preview },
   { "GET",  "/snapshot", http_snapshot },
   { "GET",  "/snapshot.jpg", http_snapshot },
   { "GET",  "/stream", http_stream },
+  { "GET",  "/?action=preview", http_preview },
   { "GET",  "/?action=snapshot", http_snapshot },
   { "GET",  "/?action=stream", http_stream },
   { "GET",  "/video", http_detect_video },

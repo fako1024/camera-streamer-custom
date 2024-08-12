@@ -5,12 +5,14 @@
 Camera capture and resolution exposed is controlled by three parameters:
 
 - `--camera-width` and `--camera-height` define the camera capture resolution
+- `--camera-preview.height` - define height for an aspect ratio scaled resolution for `/preview` (JPEG) output - this might require rescaller and might not always work
 - `--camera-snapshot.height` - define height for an aspect ratio scaled resolution for `/snapshot` (JPEG) output - this might require rescaller and might not always work
 - `--camera-video.height` - define height for an aspect ratio scaled resolution for `/video` and `/webrtc` (H264) output - this might require rescaller and might not always work, this is no larger than `--camera-snapshot.height`
 - `--camera-stream.height` - define height for an aspect ratio scaled resolution for `/stream` (MJPEG) output - this might require rescaller and might not always work, this is no larger than `--camera-video.height`
 
 The resolution scaling is following the `snapshot >= video >= stream`:
 
+- `preview` provides a low quality image for the purpose of timelapses (3Mbps-10Mbps)
 - `snapshot` provides a high quality image for the purpose of timelapses (3Mbps-10Mbps)
 - `video` is an efficient high-quality H264 video stream (3-10Mbps)
 - `stream` is an inefficient MJPEG stream requiring significant amount of bandwidth (10-100Mbps)
@@ -32,12 +34,13 @@ needs to be configured with the native resolution of camera sensor, only then th
 can be downscaled.
 
 ```text
---camera-width=2304 --camera-height=1296 --camera-snapshot.height=1080 --camera-video.height=720 --camera-stream.height=480
+--camera-width=2304 --camera-height=1296 --camera-preview.height=480 --camera-snapshot.height=1080 --camera-video.height=720 --camera-stream.height=480
 ```
 
 This will result in:
 
 - camera will capture `2304x1296` a full sensor
+- `preview` be ~640x480
 - `snapshot` be ~1920x1080
 - `video` be ~1280x720
 - `stream` be ~640x480
@@ -47,12 +50,13 @@ This will result in:
 If the camera capture is not configured properly the result image will be cropped.
 
 ```text
---camera-width=1920 --camera-height=1080 --camera-snapshot.height=1080 --camera-video.height=720 --camera-stream.height=480
+--camera-width=1920 --camera-height=1080 --camera-preview.height=480 --camera-snapshot.height=1080 --camera-video.height=720 --camera-stream.height=480
 ```
 
 This will result in:
 
 - camera will capture the middle `1920x1080` from the `2304x1296`
+- `preview` be ~640x480
 - `snapshot` be ~1920x1080
 - `video` be ~1280x720
 - `stream` be ~640x480
@@ -81,6 +85,7 @@ Depending on control they have to be used for camera, ISP, or JPEG or H264 codec
 --camera-video.options=bitrate=10000000
 
 # specify snapshot option
+--camera-preview.options=compression_quality=50
 --camera-snapshot.options=compression_quality=60
 --camera-stream.options=compression_quality=60
 ```

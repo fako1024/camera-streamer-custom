@@ -13,6 +13,8 @@ ExecStart=/usr/local/bin/camera-streamer \
   -camera-fps=15 \
   ; use two memory buffers to optimise usage
   -camera-nbufs=2 \
+  ; the preview is 640x480
+  -camera-preview.height=480 \
   ; the snapshot is 1438x1080
   -camera-snapshot.height=1080 \
   ; the video/webrtc is 958x720

@@ -52,6 +52,7 @@ typedef struct camera_options_s {
     char options[CAMERA_OPTIONS_LENGTH];
   } isp;
 
+  camera_output_options_t preview;
   camera_output_options_t snapshot;
   camera_output_options_t stream;
   camera_output_options_t video;
@@ -69,6 +70,7 @@ typedef struct camera_s {
       device_t *decoder; // decode JPEG/H264 into YUVU
       device_t *isp;
       device_t *rescallers[3];
+      device_t *codec_preview;
       device_t *codec_snapshot;
       device_t *codec_stream;
       device_t *codec_video;
