@@ -18,7 +18,7 @@ static unsigned snapshot_formats[] =
   0
 };
 
-static link_callbacks_t snapshot_callbacks =
+static link_callbacks_t preview_callbacks =
 {
   .name = "PREVIEW-CAPTURE",
   .buf_lock = &preview_lock
