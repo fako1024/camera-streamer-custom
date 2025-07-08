@@ -60,7 +60,8 @@
           body: JSON.stringify({
               type: 'request',
               res: params.res,
-              iceServers: iceServers
+              iceServers: iceServers,
+              keepAlive: true
           }),
           headers: {
               'Content-Type': 'application/json'
@@ -73,6 +74,16 @@
             sdpSemantics: 'unified-plan',
             iceServers: request.iceServers
           });
+
+          pc.addEventListener('datachannel', function(e) {
+            const dc = e.channel;
+            if (dc.label === 'keepalive') {
+              dc.addEventListener('message', function(e) {
+                dc.send('pong');
+              });
+            }
+          });
+
           pc.remote_pc_id = request.id;
           pc.addTransceiver('video', { direction: 'recvonly' });
           pc.addEventListener('track', function(evt) {
