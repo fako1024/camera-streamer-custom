@@ -16,8 +16,12 @@ extern "C" {
 #include "util/opts/helpers.hh"
 #include "util/http/json.hh"
 
+#define DEFAULT_PING_INTERVAL_US        (1 * 1000 * 1000)
+#define DEFAULT_PONG_INTERVAL_US        (30 * 1000 * 1000)
+
 #ifdef USE_LIBDATACHANNEL
 
+#include <inttypes.h>
 #include <string>
 #include <memory>
 #include <optional>
@@ -28,7 +32,6 @@ extern "C" {
 #include <rtc/peerconnection.hpp>
 #include <rtc/rtcpsrreporter.hpp>
 #include <rtc/h264rtppacketizer.hpp>
-#include <rtc/h264packetizationhandler.hpp>
 #include <rtc/rtcpnackresponder.hpp>
 
 #include "third_party/magic_enum/include/magic_enum.hpp"
@@ -48,6 +51,9 @@ static rtc::Configuration webrtc_configuration = {
   .disableAutoNegotiation = true
 };
 
+std::shared_ptr<Client> webrtc_find_client(std::string id);
+void webrtc_remove_client(const std::shared_ptr<Client> &client, const char *reason);
+
 struct ClientTrackData
 {
   std::shared_ptr<rtc::Track> track;
@@ -55,9 +61,6 @@ struct ClientTrackData
 
   void startStreaming()
   {
-    double currentTime_s = get_monotonic_time_us(NULL, NULL)/(1000.0*1000.0);
-    sender->rtpConfig->setStartTime(currentTime_s, rtc::RtpPacketizationConfig::EpochStart::T1970);
-    sender->startRecording();
   }
 
   void sendTime()
@@ -68,7 +71,7 @@ struct ClientTrackData
     uint32_t elapsedTimestamp = rtpConfig->secondsToTimestamp(currentTime_s);
 
     sender->rtpConfig->timestamp = sender->rtpConfig->startTimestamp + elapsedTimestamp;
-    auto reportElapsedTimestamp = sender->rtpConfig->timestamp - sender->previousReportedTimestamp;
+    auto reportElapsedTimestamp = sender->rtpConfig->timestamp - sender->lastReportedTimestamp();
     if (sender->rtpConfig->timestampToSeconds(reportElapsedTimestamp) > 1) {
       sender->setNeedsToReport();
     }
@@ -95,11 +98,49 @@ public:
     }
     id = "rtc-" + id;
     name = strdup(id.c_str());
+    last_ping_us = last_pong_us = get_monotonic_time_us(NULL, NULL);
   }
 
   ~Client()
   {
     free(name);
+  }
+
+  void close()
+  {
+    if (pc)
+      pc->close();
+  }
+
+  bool wantsKeepAlive()
+  {
+    return dc_keepAlive != nullptr;
+  }
+
+  bool keepAlive()
+  {
+    uint64_t now_us = get_monotonic_time_us(NULL, NULL);
+
+    if (deadline_us > 0 && now_us > deadline_us) {
+      LOG_INFO(this, "The stream reached the deadline.");
+      return false;
+    }
+  
+    if (!dc_keepAlive)
+      return true;
+
+    if (dc_keepAlive->isOpen() && now_us - last_ping_us >= DEFAULT_PING_INTERVAL_US) {
+      LOG_DEBUG(this, "Checking if client still alive.");
+      dc_keepAlive->send("ping");
+      last_ping_us = now_us;
+    }
+
+    if (now_us - last_pong_us >= DEFAULT_PONG_INTERVAL_US) {
+      LOG_INFO(this, "No heartbeat from client.");
+      return false;
+    }
+
+    return true;
   }
 
   bool wantsFrame() const
@@ -164,6 +205,7 @@ public:
   char *name = NULL;
   std::string id;
   std::shared_ptr<rtc::PeerConnection> pc;
+  std::shared_ptr<rtc::DataChannel> dc_keepAlive;
   std::shared_ptr<ClientTrackData> video;
   std::mutex lock;
   std::condition_variable wait_for_complete;
@@ -171,6 +213,9 @@ public:
   bool has_set_sdp_answer = false;
   bool had_key_frame = false;
   bool requested_key_frame = false;
+  uint64_t last_ping_us = 0;
+  uint64_t last_pong_us = 0;
+  uint64_t deadline_us = 0;
 };
 
 std::shared_ptr<Client> webrtc_find_client(std::string id)
@@ -185,7 +230,7 @@ std::shared_ptr<Client> webrtc_find_client(std::string id)
   return std::shared_ptr<Client>();
 }
 
-static void webrtc_remove_client(const std::shared_ptr<Client> &client, const char *reason)
+void webrtc_remove_client(const std::shared_ptr<Client> &client, const char *reason)
 {
   std::unique_lock lk(webrtc_clients_lock);
   webrtc_clients.erase(client);
@@ -199,14 +244,13 @@ static std::shared_ptr<ClientTrackData> webrtc_add_video(const std::shared_ptr<r
   video.setBitrate(1000);
   video.addSSRC(ssrc, cname, msid, cname);
   auto track = pc->addTrack(video);
-  auto rtpConfig = std::make_shared<rtc::RtpPacketizationConfig>(ssrc, cname, payloadType, rtc::H264RtpPacketizer::defaultClockRate);
+  auto rtpConfig = std::make_shared<rtc::RtpPacketizationConfig>(ssrc, cname, payloadType, rtc::H264RtpPacketizer::ClockRate);
   auto packetizer = std::make_shared<rtc::H264RtpPacketizer>(rtc::H264RtpPacketizer::Separator::LongStartSequence, rtpConfig);
-  auto h264Handler = std::make_shared<rtc::H264PacketizationHandler>(packetizer);
   auto srReporter = std::make_shared<rtc::RtcpSrReporter>(rtpConfig);
-  h264Handler->addToChain(srReporter);
+  packetizer->addToChain(srReporter);
   auto nackResponder = std::make_shared<rtc::RtcpNackResponder>();
-  h264Handler->addToChain(nackResponder);
-  track->setMediaHandler(h264Handler);
+  packetizer->addToChain(nackResponder);
+  track->setMediaHandler(packetizer);
   return std::shared_ptr<ClientTrackData>(new ClientTrackData{track, srReporter});
 }
 
@@ -259,6 +303,34 @@ static std::shared_ptr<Client> webrtc_peer_connection(rtc::Configuration config,
   auto pc = std::make_shared<rtc::PeerConnection>(config);
   auto client = std::make_shared<Client>(pc);
   auto wclient = std::weak_ptr(client);
+
+  if (message.value("keepAlive", false)) {
+    LOG_INFO(client.get(), "Client supports Keep-Alives.");
+
+    client->dc_keepAlive = pc->createDataChannel("keepalive");
+
+    client->dc_keepAlive->onOpen([wclient]() {
+      if(auto client = wclient.lock()) {
+        LOG_DEBUG(client.get(), "data channel onOpen");
+      }
+    });
+
+    client->dc_keepAlive->onMessage([wclient](auto message) {
+      auto client = wclient.lock();
+      if(client && std::holds_alternative<rtc::string>(message)) {
+        LOG_DEBUG(client.get(), "data channel onMessage: %s", std::get<std::string>(message).c_str());
+        client->last_pong_us = get_monotonic_time_us(NULL, NULL);
+      }
+    });
+  } else {
+    LOG_INFO(client.get(), "Client does not support Keep-Alives. This might result in stale streams.");
+  }
+
+  int64_t timeout_s = message.value("timeout_s", webrtc_options->timeout_s);
+  if (timeout_s > 0) {
+    LOG_INFO(client.get(), "The stream will auto-close in %" PRId64 "s.", timeout_s);
+    client->deadline_us = get_monotonic_time_us(NULL, NULL) + timeout_s * 1000 * 1000;
+  }
 
   pc->onTrack([wclient](std::shared_ptr<rtc::Track> track) {
     if(auto client = wclient.lock()) {
@@ -323,10 +395,19 @@ static bool webrtc_h264_needs_buffer(buffer_lock_t *buf_lock)
 
 static void webrtc_h264_capture(buffer_lock_t *buf_lock, buffer_t *buf)
 {
+  std::set<std::shared_ptr<Client> > lost_clients;
+
   std::unique_lock lk(webrtc_clients_lock);
   for (auto client : webrtc_clients) {
     if (client->wantsFrame())
       client->pushFrame(buf);
+    if (!client->keepAlive())
+      lost_clients.insert(client);
+  }
+  lk.unlock();
+
+  for (auto lost_client : lost_clients) {
+    lost_client->close();
   }
 }
 
@@ -335,7 +416,7 @@ static void http_webrtc_request(http_worker_t *worker, FILE *stream, const nlohm
   auto client = webrtc_peer_connection(webrtc_configuration, message);
   LOG_INFO(client.get(), "Stream requested.");
 
-  client->video = webrtc_add_video(client->pc, webrtc_client_video_payload_type, rand(), "video", "");
+  client->video = webrtc_add_video(client->pc, webrtc_client_video_payload_type, rand(), "video", "stream");
 
   try {
     {
@@ -350,6 +431,7 @@ static void http_webrtc_request(http_worker_t *worker, FILE *stream, const nlohm
       message["id"] = client->id;
       message["type"] = description->typeString();
       message["sdp"] = std::string(description.value());
+      message["keepAlive"] = client->wantsKeepAlive();
       client->describePeerConnection(message);
       http_write_response(stream, "200 OK", "application/json", message.dump().c_str(), 0);
       LOG_VERBOSE(client.get(), "Local SDP Offer: %s", std::string(message["sdp"]).c_str());
@@ -407,7 +489,7 @@ static void http_webrtc_offer(http_worker_t *worker, FILE *stream, const nlohman
   LOG_VERBOSE(client.get(), "Remote SDP Offer: %s", std::string(message["sdp"]).c_str());
 
   try {
-    client->video = webrtc_add_video(client->pc, webrtc_client_video_payload_type, rand(), "video", "");
+    client->video = webrtc_add_video(client->pc, webrtc_client_video_payload_type, rand(), "video", "stream");
 
     {
       std::unique_lock lock(client->lock);
@@ -422,6 +504,7 @@ static void http_webrtc_offer(http_worker_t *worker, FILE *stream, const nlohman
       nlohmann::json message;
       message["type"] = description->typeString();
       message["sdp"] = std::string(description.value());
+      message["keepAlive"] = client->wantsKeepAlive();
       client->describePeerConnection(message);
       http_write_response(stream, "200 OK", "application/json", message.dump().c_str(), 0);
 
@@ -507,6 +590,7 @@ extern "C" int webrtc_server(webrtc_options_t *options)
 
   buffer_lock_register_check_streaming(&video_lock, webrtc_h264_needs_buffer);
   buffer_lock_register_notify_buffer(&video_lock, webrtc_h264_capture);
+
   options->running = true;
   return 0;
 }

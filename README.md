@@ -16,10 +16,18 @@ Take into account that this is a draft project, and is nowhere as complete
 and well supported as [awesome ustreamer](https://github.com/pikvm/ustreamer).
 This project was inspired by mentioned ustreamer.
 
+To clone this repository be sure to use the following command:
+
+	git clone --recurse-submodules https://github.com/ayufan/camera-streamer.git
+
 ## Requirements
 
-1. Debian Bullseye, with at least 5.15 kernel
+1. Debian Bookworm, with at least 6.1 kernel
 1. Best: Raspberry PI for hardware acceleration
+
+Older systems:
+
+1. Debian Bullseye. Use version `v0.3.x` from [stable-0.3](https://github.com/ayufan/camera-streamer/tree/stable-0.3).
 
 ## Install
 
