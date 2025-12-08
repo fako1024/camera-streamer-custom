@@ -18,7 +18,6 @@ extern "C" {
 
 #define DEFAULT_PING_INTERVAL_US        (1 * 1000 * 1000)
 #define DEFAULT_PONG_INTERVAL_US        (30 * 1000 * 1000)
-#define DEFAULT_TIMEOUT_S               (60 * 60)
 
 #ifdef USE_LIBDATACHANNEL
 
@@ -33,7 +32,6 @@ extern "C" {
 #include <rtc/peerconnection.hpp>
 #include <rtc/rtcpsrreporter.hpp>
 #include <rtc/h264rtppacketizer.hpp>
-#include <rtc/h264packetizationhandler.hpp>
 #include <rtc/rtcpnackresponder.hpp>
 
 #include "third_party/magic_enum/include/magic_enum.hpp"
@@ -63,9 +61,6 @@ struct ClientTrackData
 
   void startStreaming()
   {
-    double currentTime_s = get_monotonic_time_us(NULL, NULL)/(1000.0*1000.0);
-    sender->rtpConfig->setStartTime(currentTime_s, rtc::RtpPacketizationConfig::EpochStart::T1970);
-    sender->startRecording();
   }
 
   void sendTime()
@@ -76,7 +71,7 @@ struct ClientTrackData
     uint32_t elapsedTimestamp = rtpConfig->secondsToTimestamp(currentTime_s);
 
     sender->rtpConfig->timestamp = sender->rtpConfig->startTimestamp + elapsedTimestamp;
-    auto reportElapsedTimestamp = sender->rtpConfig->timestamp - sender->previousReportedTimestamp;
+    auto reportElapsedTimestamp = sender->rtpConfig->timestamp - sender->lastReportedTimestamp();
     if (sender->rtpConfig->timestampToSeconds(reportElapsedTimestamp) > 1) {
       sender->setNeedsToReport();
     }
@@ -249,14 +244,13 @@ static std::shared_ptr<ClientTrackData> webrtc_add_video(const std::shared_ptr<r
   video.setBitrate(1000);
   video.addSSRC(ssrc, cname, msid, cname);
   auto track = pc->addTrack(video);
-  auto rtpConfig = std::make_shared<rtc::RtpPacketizationConfig>(ssrc, cname, payloadType, rtc::H264RtpPacketizer::defaultClockRate);
+  auto rtpConfig = std::make_shared<rtc::RtpPacketizationConfig>(ssrc, cname, payloadType, rtc::H264RtpPacketizer::ClockRate);
   auto packetizer = std::make_shared<rtc::H264RtpPacketizer>(rtc::H264RtpPacketizer::Separator::LongStartSequence, rtpConfig);
-  auto h264Handler = std::make_shared<rtc::H264PacketizationHandler>(packetizer);
   auto srReporter = std::make_shared<rtc::RtcpSrReporter>(rtpConfig);
-  h264Handler->addToChain(srReporter);
+  packetizer->addToChain(srReporter);
   auto nackResponder = std::make_shared<rtc::RtcpNackResponder>();
-  h264Handler->addToChain(nackResponder);
-  track->setMediaHandler(h264Handler);
+  packetizer->addToChain(nackResponder);
+  track->setMediaHandler(packetizer);
   return std::shared_ptr<ClientTrackData>(new ClientTrackData{track, srReporter});
 }
 
@@ -332,7 +326,7 @@ static std::shared_ptr<Client> webrtc_peer_connection(rtc::Configuration config,
     LOG_INFO(client.get(), "Client does not support Keep-Alives. This might result in stale streams.");
   }
 
-  int64_t timeout_s = message.value("timeout_s", DEFAULT_TIMEOUT_S);
+  int64_t timeout_s = message.value("timeout_s", webrtc_options->timeout_s);
   if (timeout_s > 0) {
     LOG_INFO(client.get(), "The stream will auto-close in %" PRId64 "s.", timeout_s);
     client->deadline_us = get_monotonic_time_us(NULL, NULL) + timeout_s * 1000 * 1000;
@@ -422,7 +416,7 @@ static void http_webrtc_request(http_worker_t *worker, FILE *stream, const nlohm
   auto client = webrtc_peer_connection(webrtc_configuration, message);
   LOG_INFO(client.get(), "Stream requested.");
 
-  client->video = webrtc_add_video(client->pc, webrtc_client_video_payload_type, rand(), "video", "");
+  client->video = webrtc_add_video(client->pc, webrtc_client_video_payload_type, rand(), "video", "stream");
 
   try {
     {
@@ -495,7 +489,7 @@ static void http_webrtc_offer(http_worker_t *worker, FILE *stream, const nlohman
   LOG_VERBOSE(client.get(), "Remote SDP Offer: %s", std::string(message["sdp"]).c_str());
 
   try {
-    client->video = webrtc_add_video(client->pc, webrtc_client_video_payload_type, rand(), "video", "");
+    client->video = webrtc_add_video(client->pc, webrtc_client_video_payload_type, rand(), "video", "stream");
 
     {
       std::unique_lock lock(client->lock);
